@@ -5,7 +5,7 @@ LDLIBS = -ll -ly
 PARSER = parser
 SOURCES = main.c ast.c semantic.c symbols.c types.c y.tab.c lex.yy.c
 
-.PHONY: all run test ast clean
+.PHONY: all run test test-widening ast clean
 
 all: $(PARSER)
 
@@ -25,6 +25,11 @@ test: $(PARSER)
 	@echo
 	@echo "== error-unknown =="
 	@./$(PARSER) tests/error-unknown.expr || true
+
+test-widening: $(PARSER)
+	@echo "== widening =="
+	@echo "Dieser Test soll nach der Erweiterung der Zuweisungsregel erfolgreich sein."
+	@./$(PARSER) tests/widening.expr
 
 ast: run
 

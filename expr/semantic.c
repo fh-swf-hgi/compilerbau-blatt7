@@ -64,7 +64,7 @@ static DataType analyze_node(AstNode *node)
             /* Erste Zuweisung: Typ in die Symboltabelle eintragen. */
             node->left->value.symbol->type = right_type;
         } else if (node->left->value.symbol->type != right_type) {
-            /* Spaetere Zuweisung: Typ muss zum bestehenden Eintrag passen. */
+            /* Aktuelle Regel: Spaetere Zuweisungen muessen typgleich sein. */
             semantic_error("Variable hat bereits einen anderen Typ",
                            node->left->value.symbol->name,
                            node->left->value.symbol->type, right_type);

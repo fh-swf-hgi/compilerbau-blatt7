@@ -24,6 +24,15 @@ Weitere Testfaelle lassen sich mit folgendem Ziel ausfuehren:
 make test
 ```
 
+Der Zieltest fuer die Erweiterung der Zuweisungsregel ist separat:
+
+```sh
+make test-widening
+```
+
+Dieser Test schlaegt im Ausgangszustand fehl und soll nach der Erweiterung der
+semantischen Traversierung erfolgreich sein.
+
 ## Wichtige Dateien
 
 - `parser.l`: Scanner-Regeln fuer Bezeichner, Integer, Double und Operatoren
