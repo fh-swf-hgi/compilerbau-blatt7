@@ -15,15 +15,19 @@ run: $(PARSER)
 
 test: $(PARSER)
 	@echo "== ok-simple =="
+	@cat tests/ok-simple.expr
 	@./$(PARSER) tests/ok-simple.expr
 	@echo
 	@echo "== ok-mixed =="
+	@cat tests/ok-mixed.expr
 	@./$(PARSER) tests/ok-mixed.expr
 	@echo
 	@echo "== error-reassign =="
+	@cat tests/error-reassign.expr
 	@./$(PARSER) tests/error-reassign.expr || true
 	@echo
 	@echo "== error-unknown =="
+	@cat tests/error-unknown.expr 
 	@./$(PARSER) tests/error-unknown.expr || true
 
 test-widening: $(PARSER)
