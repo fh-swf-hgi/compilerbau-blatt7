@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -std=c11
+CFLAGS = -Wall -std=gnu11
 LDLIBS = -ll -ly
 
 PARSER = parser
