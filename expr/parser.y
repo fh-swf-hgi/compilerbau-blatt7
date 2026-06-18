@@ -1,155 +1,80 @@
 %{
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "ast.h"
 #include "parser.h"
-#include "y.tab.h"
-inline void yyerror(const char *s) { printf("%s", s); }
-extern int yylex();
+
+int yylex(void);
 extern FILE *yyin;
 
-extern struct Node* RootOfAst;
-static int nodecnt = 0;
+static AstNode *root_of_ast = NULL;
 
-int num_entries = 0;
-struct symtabentry symtab[MAXSYMS];
-
+void yyerror(const char *message)
+{
+    fprintf(stderr, "Syntaxfehler: %s\n", message);
+}
 %}
 
 %union
 {
-    int i;
-    double f;
-    struct symtabentry *n;
-    struct Node *astNode;
+    int int_value;
+    double double_value;
+    Symbol *symbol;
+    AstNode *node;
 }
 
 %left SYMPLUS SYMMINUS
 %left SYMMULT
 
-%token <f> FLT
-%token <i> INT
-%token <n> IDENT
+%token <double_value> FLT
+%token <int_value> INT
+%token <symbol> IDENT
 
-%type <astNode> prog stmts stmt expr term var
+%type <node> prog stmts stmt expr term var
 
 %start prog
 %%
 
-prog: stmts { RootOfAst = $1; }
-	;
+prog:
+    stmts { root_of_ast = $1; $$ = $1; }
+    ;
 
-stmts: stmts stmt { $$ = newStmtNode(StmtNode, $1, $2); }
-	| stmt { $$ = $1; }
-	;
+stmts:
+    stmts stmt { $$ = ast_new_binary(StmtNode, $1, $2); }
+    | stmt { $$ = $1; }
+    ;
 
-stmt: expr '=' expr { $$ = newAssignementNode(AsgmtNode, $1, $3); }
-	| expr { $$ = newExprNode(ExprNode, $1); }
-	;
+stmt:
+    var '=' expr { $$ = ast_new_binary(AssignNode, $1, $3); }
+    | expr { $$ = ast_new_unary(ExprStmtNode, $1); }
+    ;
 
-expr: expr SYMPLUS expr { $$ = newBinOpNode(AddNode, $1, $3); }
-		| expr SYMMINUS expr { $$ = newBinOpNode(SubNode, $1, $3); }
-		| expr SYMMULT expr { $$ = newBinOpNode(MulNode, $1, $3); }
-		| term { $$ = $1; }
-		;
+expr:
+    expr SYMPLUS expr { $$ = ast_new_binary(AddNode, $1, $3); }
+    | expr SYMMINUS expr { $$ = ast_new_binary(SubNode, $1, $3); }
+    | expr SYMMULT expr { $$ = ast_new_binary(MulNode, $1, $3); }
+    | term { $$ = $1; }
+    ;
 
-term: '(' expr ')' { $$ = $2; }
-	| FLT { $$ = newDoubleNode($1); }
-	| INT { $$ = newIntNode($1); }
-	| var { $$ = $1; }
-	;
+term:
+    '(' expr ')' { $$ = $2; }
+    | FLT { $$ = ast_new_double($1); }
+    | INT { $$ = ast_new_int($1); }
+    | var { $$ = $1; }
+    ;
 
-var: IDENT { $$ = newIdentNode($1); }
-	;
+var:
+    IDENT { $$ = ast_new_ident($1); }
+    ;
 
 %%
 
-//int main() { yyparse(); }
+AstNode *parse_file(FILE *input)
+{
+    yyin = input;
+    root_of_ast = NULL;
 
-
-struct symtabentry * access_symtab(char *s) {
-	char *p;
-	struct symtabentry *sp;
-	sp = symtab;
-	int i;
-	for(i=0; i<MAXSYMS; i++) {
-		/* Ist das Symbol schon in der Tabelle? */
-		if(sp->name && !strcmp(sp->name, s))
-			return sp;
-		/* Ist die Stelle in der Tabelle frei? */
-		if(!sp->name) {
-			sp->name = strdup(s);
-			sp->type = UnknownType;
-			printf("Insert Symbol %s\n", s);
-			return sp;
-		}
-		sp++; //Naechstes Symbol
-	}
-	yyerror("Symboltabelle zu klein");
-	exit(1); /* Fehler */
+    if (yyparse()) {
+        return NULL;
+    }
+    return root_of_ast;
 }
-
-struct Node* RootOfAst;
-
-struct Node* newIntNode(int i) {
-	struct Node *erg = (struct Node*) malloc(sizeof(struct Node));
-	erg-> id = nodecnt++;
-	erg->content.intValue = i;
-	erg->kind = IntNode;
-	erg->type = IntType;
-	erg->left = erg->right = 0;
-	erg->type = IntType;
-	return erg;
-}
-struct Node* newDoubleNode(double i) {
-	struct Node *erg = (struct Node*) malloc(sizeof(struct Node));
-	erg-> id = nodecnt++;
-	erg->content.doubleValue = i;
-	erg->kind = DoubleNode;
-	erg->type = DoubleType;
-	erg->left = erg->right = 0;
-	erg->type = DoubleType;
-	return erg;
-}
-struct Node* newIdentNode(struct symtabentry *i) {
-	struct Node *erg = (struct Node*) malloc(sizeof(struct Node));
-	erg-> id = nodecnt++;
-	erg->content.ident = i;
-	erg->kind = IdentNode;
-	erg->type = UnknownType;
-	erg->left = erg->right = 0;
-	erg->type = UnknownType;
-	return erg;
-}
-struct Node* newBinOpNode(NodeType kind, struct Node* left, struct Node* right) {
-	struct Node *erg = (struct Node*) malloc(sizeof(struct Node));
-	erg-> id = nodecnt++;
-	erg->kind = kind;
-	erg->left = left;
-	erg->right = right;
-	erg->type = UnknownType;
-	return erg;
-}
-
-struct Node* newStmtNode(NodeType kind, struct Node* left, struct Node* right) {
-	return newBinOpNode(kind, left, right);
-}
-
-struct Node* newAssignementNode(NodeType kind, struct Node* left, struct Node* right) {
-	return newBinOpNode(kind, left, right);
-}
-
-struct Node* newExprNode(NodeType kind, struct Node* e) {
-	return newBinOpNode(kind, e, 0);
-}
-
-
-struct Node* parse(FILE *fp) {
-	yyin = fp;
-    if (yyparse()) return 0;
-    else return RootOfAst;
-}
-
-
-
-

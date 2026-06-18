@@ -1,117 +1,126 @@
-﻿#include "parser.h"
-#include <stdio.h>
+#include "ast.h"
 #include <stdlib.h>
 
+static int next_node_id = 0;
 
-extern struct Node* parse();
-
-void fprintNode(struct Node* n, FILE* fp) {
-  
-	char typeInfo;
-	switch (n->type) {
-		case DoubleType: typeInfo = 'd'; break;
-		case IntType: typeInfo = 'i'; break;
-		default: typeInfo = '?'; break;
-	}
-	switch (n->kind) {
-		case StmtNode:  fprintf(fp, "Stmt (%c)", typeInfo); break;
-		case AsgmtNode: fprintf(fp, "= (%c)", typeInfo); break;
-		case ExprNode:  fprintf(fp, "Expr (%c)", typeInfo); break;
-		case AddNode:   fprintf(fp, "Add (%c)", typeInfo); break;
-		case SubNode:   fprintf(fp, "Sub (%c)", typeInfo); break;
-		case MulNode:   fprintf(fp, "Mul (%c)", typeInfo); break;
-		case IdentNode: fprintf(fp, "%s (%c)", n->content.ident->name, typeInfo); break;
-		case IntNode:   fprintf(fp, "%d (%c)", n->content.intValue, typeInfo); break;
-		case DoubleNode:fprintf(fp, "%.2f (%c)", n->content.doubleValue, typeInfo); break;
-  	}
-}
-
-
-void _print_node(struct Node* node, FILE* fp){
-	fprintf(fp, "    %d [label=\"", node->id);
-	fprintNode(node, fp);
-	fprintf(fp, "\"]\n");
-}
-
-void _print_tree(struct Node* node, FILE* fp)
+static AstNode *ast_new_node(NodeType kind)
 {
-	_print_node(node, fp);
-    if (node->left)
-    {
-        fprintf(fp, "    %d -> %d;\n", node->id, node->left->id);
-        _print_tree(node->left, fp);
-    } 
+    AstNode *node = malloc(sizeof(AstNode));
+    if (!node) {
+        fprintf(stderr, "Kein Speicher fuer AST-Knoten\n");
+        exit(1);
+    }
 
-    if (node->right)
-    {
-        fprintf(fp, "    %d -> %d;\n", node->id, node->right->id);
-        _print_tree(node->right, fp);
+    node->kind = kind;
+    node->id = next_node_id++;
+    node->type = UnknownType;
+    node->left = NULL;
+    node->right = NULL;
+    return node;
+}
+
+AstNode *ast_new_int(int value)
+{
+    AstNode *node = ast_new_node(IntNode);
+    node->type = IntType;
+    node->value.int_value = value;
+    return node;
+}
+
+AstNode *ast_new_double(double value)
+{
+    AstNode *node = ast_new_node(DoubleNode);
+    node->type = DoubleType;
+    node->value.double_value = value;
+    return node;
+}
+
+AstNode *ast_new_ident(Symbol *symbol)
+{
+    AstNode *node = ast_new_node(IdentNode);
+    node->value.symbol = symbol;
+    return node;
+}
+
+AstNode *ast_new_unary(NodeType kind, AstNode *child)
+{
+    AstNode *node = ast_new_node(kind);
+    node->left = child;
+    return node;
+}
+
+AstNode *ast_new_binary(NodeType kind, AstNode *left, AstNode *right)
+{
+    AstNode *node = ast_new_node(kind);
+    node->left = left;
+    node->right = right;
+    return node;
+}
+
+static void ast_print_label(AstNode *node, FILE *out)
+{
+    char type = type_short_name(node->type);
+
+    switch (node->kind) {
+    case StmtNode:
+        fprintf(out, "Stmt (%c)", type);
+        break;
+    case AssignNode:
+        fprintf(out, "= (%c)", type);
+        break;
+    case ExprStmtNode:
+        fprintf(out, "Expr (%c)", type);
+        break;
+    case AddNode:
+        fprintf(out, "Add (%c)", type);
+        break;
+    case SubNode:
+        fprintf(out, "Sub (%c)", type);
+        break;
+    case MulNode:
+        fprintf(out, "Mul (%c)", type);
+        break;
+    case IdentNode:
+        fprintf(out, "%s (%c)", node->value.symbol->name, type);
+        break;
+    case IntNode:
+        fprintf(out, "%d (%c)", node->value.int_value, type);
+        break;
+    case DoubleNode:
+        fprintf(out, "%.2f (%c)", node->value.double_value, type);
+        break;
     }
 }
 
-void print_tree(struct Node* tree, FILE* fp)
+static void ast_print_node(AstNode *node, FILE *out)
 {
-    fprintf(fp, "digraph BST {\n");
-    fprintf(fp, "    node [fontname=\"Arial\"];\n");
-
-    if (!tree)
-        fprintf(fp, "\n");
-    else if (!tree->right && !tree->left)
-        _print_node(tree, fp);
-    else
-        _print_tree(tree, fp);
-
-    fprintf(fp, "}\n");
+    fprintf(out, "    %d [label=\"", node->id);
+    ast_print_label(node, out);
+    fprintf(out, "\"];\n");
 }
 
-
-DataType _walk_tree(struct Node* node)
+static void ast_print_edges(AstNode *node, FILE *out)
 {
-	DataType tl=UnknownType, tr=UnknownType;
-	switch (node->kind) {
-    case IntNode:
-		node->type = IntType;
-		return IntType;
-    case DoubleNode:
-		node->type = DoubleType;
-		return DoubleType;
-    case IdentNode:
-		node->type = node->content.ident->type;
-		return node->type;
-    default: 
-		if (node->left)  tl = _walk_tree(node->left);
-	    if (node->right) tr = _walk_tree(node->right); 
-		node->type = (tl>tr) ? tl : tr;
-		return node->type;
-  }
+    ast_print_node(node, out);
+
+    if (node->left) {
+        fprintf(out, "    %d -> %d;\n", node->id, node->left->id);
+        ast_print_edges(node->left, out);
+    }
+    if (node->right) {
+        fprintf(out, "    %d -> %d;\n", node->id, node->right->id);
+        ast_print_edges(node->right, out);
+    }
 }
 
-void walk_tree(struct Node* tree)
+void ast_print_dot(AstNode *tree, FILE *out)
 {
-    if (!tree)
-        printf("Baum existiert nicht \n");
-    else if (!tree->right && !tree->left)
-        printf("Baum ist leer\n");
-    else
-        tree->type = _walk_tree(tree);
-}
+    fprintf(out, "digraph AST {\n");
+    fprintf(out, "    node [fontname=\"Arial\"];\n");
 
+    if (tree) {
+        ast_print_edges(tree, out);
+    }
 
-int main(int argc, char **argv) {
-	FILE * ifile;
-	if(argc > 1) {
-		if(!(ifile = fopen(argv[1], "r"))) {
-		 	perror(argv[1]);
-		 	return 1;
-		}
-	}
-	else ifile = stdin;
-	printf("Parsing file\n");
-	struct Node* root = parse(ifile);
-	FILE *fp;
-	fp = fopen("ast.dot", "w+");
-	if (root) walk_tree(root);
-	if (root) print_tree(root, fp);
-	fclose(fp);
-	return 0;
+    fprintf(out, "}\n");
 }
