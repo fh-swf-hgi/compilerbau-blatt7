@@ -63,11 +63,20 @@ static DataType analyze_node(AstNode *node)
         if (node->left->value.symbol->type == UnknownType) {
             /* Erste Zuweisung: Typ in die Symboltabelle eintragen. */
             node->left->value.symbol->type = right_type;
-        } else if (node->left->value.symbol->type != right_type) {
-            /* Aktuelle Regel: Spaetere Zuweisungen muessen typgleich sein. */
-            semantic_error("Variable hat bereits einen anderen Typ",
-                           node->left->value.symbol->name,
-                           node->left->value.symbol->type, right_type);
+        } else {
+            /*
+             * TYPE WIDENING:
+             * Fuegen Sie hier Code ein, der den vorhandenen Variablentyp
+             * und right_type zum allgemeineren Typ zusammenfasst.
+             * Wenn diese Erweiterung implementiert ist, soll diese Stelle
+             * vor der folgenden Fehlerbehandlung mit return verlassen werden.
+             */
+            if (node->left->value.symbol->type != right_type) {
+                /* Aktuelle Regel: Spaetere Zuweisungen muessen typgleich sein. */
+                semantic_error("Variable hat bereits einen anderen Typ",
+                               node->left->value.symbol->name,
+                               node->left->value.symbol->type, right_type);
+            }
         }
         return node->type;
 
